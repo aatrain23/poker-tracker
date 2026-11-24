@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poker Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a player's ledger, plain and quick to use at the table
+   IDEA: the felt and the chip rack: a green rail on top, chips as the colour key
+   PICTURE: the log form is the picture on open; the running-total line leads Reports
+   COLOUR and TYPE: felt green, chip red, chip blue, chip gold; Barlow Condensed for figures, Barlow for text
+   LAYOUT: felt header with the period net, three views (Log, Reports, History), one calm column on phones */
+:root{color-scheme:light dark;
+--bg:light-dark(#ffffff,#0d1311);--panel:light-dark(#f3f6f4,#151d1a);--line:light-dark(#dde4e0,#26322d);
+--ink:light-dark(#14201b,#e7eeea);--mute:light-dark(#5a6b63,#9aaba3);
+--felt:#0f5a40;--felt2:#0b4431;--up:light-dark(#137a4c,#4fc98a);--down:light-dark(#c0392b,#ff7a6b);
+--cash:light-dark(#2563c9,#6aa3ff);--mtt:light-dark(#c23a3a,#ff7c7c);--onl:light-dark(#b07a00,#f0bb3c);--tot:var(--ink)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip}
+h1,h2,.big,.tile b{font-family:"Barlow Condensed",Barlow,sans-serif;font-weight:700;line-height:1.05}
+h2{font-size:24px;margin:0 0 12px}
+header{background:linear-gradient(180deg,var(--felt),var(--felt2));color:#f2f7f4;padding:18px max(4vw,16px) 0}
+.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between;max-width:1240px;margin:0 auto}
+h1{font-size:clamp(30px,5vw,44px);margin:0}
+.hnet{text-align:right}.hnet .big{font-size:clamp(30px,5vw,44px)}.hnet small{display:block;color:#bcd6ca;font-size:14px}
+nav{display:flex;gap:4px;max-width:1240px;margin:14px auto 0}
+nav a{color:#d7e8df;text-decoration:none;padding:10px 18px;border-radius:10px 10px 0 0;font-weight:600;min-height:44px}
+nav a[aria-current]{background:var(--bg);color:var(--ink)}
+main{max-width:1240px;margin:0 auto;padding:22px max(4vw,16px) 60px}
+.view{display:none}.view.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
+@media(max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;flex-wrap:wrap}
+.seg button{border:0;background:none;color:var(--ink);font:600 15px Barlow;padding:9px 16px;border-radius:9px;min-height:40px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--felt);color:#fff}
+form .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:12px}
+label{display:block;font-size:14px;color:var(--mute);font-weight:500}
+input,select,textarea{display:block;width:100%;margin-top:4px;font:16px Barlow;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px}
+textarea{min-height:64px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{outline:3px solid color-mix(in srgb,var(--felt) 55%,transparent);outline-offset:1px}
+.btn{border:0;border-radius:10px;font:600 16px Barlow;padding:11px 18px;min-height:44px;cursor:pointer;background:var(--felt);color:#fff}
+.btn.ghost{background:none;color:var(--ink);border:1px solid var(--line)}
+.btn.red{background:var(--down);color:#fff}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
+.netprev{font-family:"Barlow Condensed";font-size:30px;font-weight:700;margin-left:auto}
+.up{color:var(--up)}.down{color:var(--down)}.mute{color:var(--mute)}
+.live{display:none;margin-bottom:14px;border-radius:12px;padding:12px 14px;background:color-mix(in srgb,var(--felt) 14%,var(--bg));border:1px solid color-mix(in srgb,var(--felt) 40%,var(--line))}
+.live.on{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.live b{font-family:"Barlow Condensed";font-size:24px}
+.live input{width:110px;display:inline-block;margin:0}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:center}
+.list li:last-child{border-bottom:0}
+.chip{width:12px;height:12px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 2px color-mix(in srgb,#fff 55%,transparent)}
+.k-cash{background:var(--cash)}.k-mtt{background:var(--mtt)}.k-online{background:var(--onl)}
+.sub{font-size:14px;color:var(--mute)}
+.amt{font-family:"Barlow Condensed";font-weight:700;font-size:20px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.li-act{display:flex;gap:6px;justify-content:flex-end}
+.li-act button{font:600 14px Barlow;background:none;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 10px;min-height:36px;cursor:pointer}
+.filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:18px}
+.filters label{min-width:140px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.tile b{display:block;font-size:clamp(26px,3.4vw,34px);margin:2px 0;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tile span{font-size:14px;color:var(--mute)}
+.fig{position:relative;min-height:320px}.fig>svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.fig.short{min-height:220px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.legend button{display:inline-flex;gap:8px;align-items:center;font:600 14px Barlow;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:6px 12px;min-height:36px;cursor:pointer}
+.legend button[aria-pressed=false]{opacity:.45}
+.legend i{width:16px;height:3px;border-radius:2px;display:inline-block}
+.tip{position:absolute;pointer-events:none;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.15);display:none;z-index:2;white-space:nowrap}
+.sec{margin-top:28px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr));gap:24px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:13px;color:var(--mute);font-weight:600}
+td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+tr.click{cursor:pointer}tr.click:hover td{background:color-mix(in srgb,var(--felt) 7%,transparent)}
+.pill{font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);border-radius:12px;padding:10px 14px;display:none;gap:12px;align-items:center;z-index:9;max-width:calc(100vw - 24px)}
+.toast.on{display:flex}.toast button{background:none;border:1px solid currentColor;color:inherit;border-radius:8px;font:600 14px Barlow;padding:6px 10px;cursor:pointer}
+.status{padding:12px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--line);margin-bottom:16px;display:none}.status.on{display:block}
+.scroll{overflow-x:auto}
+details summary{cursor:pointer;font-weight:600}
+@media(prefers-reduced-motion:no-preference){.view.on{animation:fade .18s ease}@keyframes fade{from{opacity:0;transform:translateY(4px)}}}
+@media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mute)}.stack td:empty{display:none}nav a{padding:10px 12px}.hnet{text-align:left}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>Poker log</h1>
+    <div class="hnet"><span class="big" id="hNet">—</span><small id="hSub">Loading your results…</small></div>
+  </div>
+  <nav aria-label="Views">
+    <a href="#log" data-v="log">Log</a><a href="#reports" data-v="reports">Reports</a><a href="#history" data-v="history">History</a>
+  </nav>
+</header>
+<main>
+  <div class="status" id="status"></div>
+
+  <section class="view" id="v-log">
+    <div class="grid2">
+      <div class="card">
+        <div class="live" id="live">
+          <span class="chip k-cash"></span><div><b id="liveTime">0:00</b> <span class="sub" id="liveWhat"></span></div>
+          <label style="margin-left:auto">Add-on $<input id="addAmt" type="number" inputmode="decimal" min="0" step="any"></label>
+          <button class="btn ghost" type="button" id="addBtn">Add</button>
+          <button class="btn" type="button" id="endBtn">End session</button>
+        </div>
+        <div class="seg" role="group" aria-label="Type" id="kindSeg">
+          <button type="button" data-k="cash" aria-pressed="true">Cash</button>
+          <button type="button" data-k="mtt" aria-pressed="false">Tournament</button>
+          <button type="button" data-k="online" aria-pressed="false">Online month</button>
+        </div>
+        <form id="form" autocomplete="off">
+          <div id="fields"></div>
+          <label style="margin-top:12px">Note<textarea id="f_note" placeholder="Optional"></textarea></label>
+          <div class="actions">
+            <button class="btn" type="submit" id="saveBtn">Save result</button>
+            <button class="btn ghost" type="button" id="timerBtn">Start live timer</button>
+            <button class="btn ghost" type="button" id="cancelEdit" hidden>Cancel edit</button>
+            <span class="netprev" id="netPrev"></span>
+          </div>
+        </form>
+      </div>
+      <div>
+        <div class="tiles" id="logTiles"></div>
+        <div class="card"><h2>Latest</h2><ul class="list" id="recent"></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-reports">
+    <div class="filters">
+      <label>Period<select id="pSel"></select></label>
+      <label id="fromL" hidden>From<input type="date" id="pFrom"></label>
+      <label id="toL" hidden>To<input type="date" id="pTo"></label>
+      <label>Game<select id="gSel"><option value="">All games</option><option value="NLH">NLH only</option><option value="other">Other games</option></select></label>
+      <span class="sub" id="gNote" hidden>Game is only set on 2026 live results and anything you log here.</span>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="card">
+      <h2>Running total</h2>
+      <div class="legend" id="legend"></div>
+      <div class="fig" id="runFig"><svg id="runSvg" role="img" aria-label="Running total chart"></svg><div class="tip" id="runTip"></div></div>
+    </div>
+    <div class="card sec">
+      <h2>Net by month</h2>
+      <div class="fig short" id="monFig"><svg id="monSvg" role="img" aria-label="Net by month chart"></svg><div class="tip" id="monTip"></div></div>
+    </div>
+    <div class="sec cols">
+      <div><h2>Cash game swings</h2><div id="variance"></div></div>
+      <div><h2>Trips and series</h2><p class="sub" style="margin-top:-6px">Live play grouped by run of days. Tap one to see its full report.</p><div id="trips"></div></div>
+    </div>
+    <div class="sec cols">
+      <div><h2>Cash by stakes</h2><div id="tStakes"></div></div>
+      <div><h2>Cash by casino</h2><div id="tCashVenue"></div></div>
+    </div>
+    <div class="sec cols">
+      <div><h2>Tournaments by casino or series</h2><div id="tMttVenue"></div></div>
+      <div><h2>Tournaments by buy-in (per entry)</h2><div id="tBand"></div></div>
+    </div>
+    <div class="sec cols">
+      <div><h2>Cash by day of week</h2><div id="tDow"></div></div>
+      <div><h2>Cash by session length</h2><div id="tLen"></div></div>
+    </div>
+    <div class="sec cols">
+      <div><h2>By game</h2><div id="tGame"></div></div>
+      <div><h2>Biggest results</h2><div id="tBest"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-history">
+    <div class="filters">
+      <label style="flex:1 1 220px">Search<input type="search" id="hq" placeholder="Casino, event, stakes, note"></label>
+      <label>Type<select id="hk"><option value="">All</option><option value="cash">Cash</option><option value="mtt">Tournaments</option><option value="online">Online</option></select></label>
+      <button class="btn ghost" type="button" id="copyCsv">Copy as CSV</button>
+    </div>
+    <textarea id="csvBox" hidden readonly rows="8" style="font:13px ui-monospace,monospace;margin-bottom:14px" aria-label="Results as CSV"></textarea>
+    <p class="sub" id="hCount"></p>
+    <div class="card"><ul class="list" id="hist"></ul></div>
+    <div class="actions"><button class="btn ghost" type="button" id="more" hidden>Show more</button></div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status"><span id="toastMsg"></span><button type="button" id="toastBtn" hidden>Undo</button></div>
+
+<script>
+{
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>{const n=parseFloat(v);return isFinite(n)?n:0};
+const money=(v,sign=true)=>{const a=Math.abs(v),s=a>=1000?Math.round(a).toLocaleString('en-US'):(Math.round(a*100)/100).toLocaleString('en-US',{maximumFractionDigits:2});return (v<0?'−':sign&&v>0?'+':'')+'$'+s};
+const cls=v=>v>0?'up':v<0?'down':'';
+const pct=v=>v==null||!isFinite(v)?'—':(v>0?'+':v<0?'−':'')+Math.abs(Math.round(v*1000)/10)+'%';
+const pc=v=>v==null||!isFinite(v)?'—':Math.round(v*1000)/10+'%';
+const KIND={cash:'Cash',mtt:'Tournament',online:'Online'};
+const GAMES=['NLH','PLO','2-7 Draw','Mixed (NLH/PLO)','Mixed games','Stud','Limit Hold\'em'];
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const S={rows:[],live:null,view:'log',kind:'cash',editId:null,show:{all:true,mtt:true,cash:true,online:true},histN:60};
+let undo=null,toastT=0,liveT=0,loaded=false;
+const API='https://script.google.com/macros/s/AKfycbxdraOKrwu_1c5tz36PW_7wLGiLDnYah_GCr6WJSmW-0L6Gw6F-GWpBNmdnmCuaDjKqLg/exec';
+const ls={get(k){try{return localStorage.getItem(k)}catch{return null}},set(k,v){try{localStorage.setItem(k,v)}catch{}},del(k){try{localStorage.removeItem(k)}catch{}}};
+let KEY=ls.get('pokerlog_key')||'';
+const db={ok:()=>!!KEY,
+  async load(){const r=await fetch(API+'?key='+encodeURIComponent(KEY),{cache:'no-store'});const j=await r.json();if(j.error)throw new Error(j.error);return j},
+  async post(body){const r=await fetch(API,{method:'POST',body:JSON.stringify({key:KEY,...body})});const j=await r.json();if(j.error)throw new Error(j.error);return j},
+  upsert(row){return this.post({action:'upsert',row})},
+  del(id){return this.post({action:'delete',id})},
+  live(live){return this.post({action:'live',live})}};
+function setRow(row){const i=S.rows.findIndex(x=>x.id===row.id);if(i>=0)S.rows[i]=row;else S.rows.push(row);fillPeriods();render()}
+function dropRow(id){S.rows=S.rows.filter(x=>x.id!==id);fillPeriods();render()}
+function setLive(L){S.live=L;liveTick();$('timerBtn').hidden=S.kind!=='cash'||!!S.live||!!S.editId}
+
+/* ---------- toast ---------- */
+function toast(msg,undoFn){$('toastMsg').textContent=msg;undo=undoFn||null;$('toastBtn').hidden=!undoFn;$('toast').classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>$('toast').classList.remove('on'),6000)}
+$('toastBtn').onclick=async()=>{const f=undo;undo=null;$('toast').classList.remove('on');if(f)await f()};
+function status(msg){$('status').textContent=msg||'';$('status').classList.toggle('on',!!msg)}
+
+/* ---------- views ---------- */
+function route(){const v=(location.hash||'#log').slice(1);S.view=['log','reports','history'].includes(v)?v:'log';
+  for(const a of document.querySelectorAll('nav a'))a.toggleAttribute('aria-current',a.dataset.v===S.view);
+  for(const s of document.querySelectorAll('.view'))s.classList.toggle('on',s.id==='v-'+S.view);render()}
+addEventListener('hashchange',route);
+
+/* ---------- form ---------- */
+const uniq=(k,kind)=>[...new Set(S.rows.filter(r=>!kind||r.kind===kind).map(r=>r[k]).filter(Boolean))].sort();
+function dl(id,vals){return `<datalist id="${id}">${vals.map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`}
+function gameSel(){return `<label>Game<select id="f_game"><option value="">Not set</option>${[...new Set([...GAMES,...uniq('game')])].map(g=>`<option>${esc(g)}</option>`).join('')}</select></label>`}
+function buildFields(){const k=S.kind;let h='';
+  if(k==='cash')h=`<div class="row"><label>Date<input type="date" id="f_date" required></label><label>Casino<input id="f_venue" list="dlV" required placeholder="Wynn"></label><label>Stakes<input id="f_stakes" list="dlS" placeholder="2/5"></label>${gameSel()}</div>
+   <div class="row"><label>Buy-in total $<input type="number" inputmode="decimal" step="any" min="0" id="f_buy" required></label><label>Cash-out $<input type="number" inputmode="decimal" step="any" min="0" id="f_out" required></label><label>Hours<input type="number" inputmode="decimal" step="0.25" min="0" id="f_hours"></label></div>`+dl('dlV',uniq('venue','cash'))+dl('dlS',uniq('stakes','cash'));
+  if(k==='mtt')h=`<div class="row"><label>Date<input type="date" id="f_date" required></label><label>Casino or series<input id="f_venue" list="dlV" required placeholder="WSOP"></label><label>Event<input id="f_event" list="dlE" placeholder="Daily Deepstack"></label>${gameSel()}</div>
+   <div class="row"><label>Buy-in per entry $<input type="number" inputmode="decimal" step="any" min="0" id="f_per" required></label><label>Entries<input type="number" inputmode="numeric" min="1" step="1" id="f_ent" value="1"></label><label>Cashed for $<input type="number" inputmode="decimal" step="any" min="0" id="f_out" value="0"></label></div>
+   <div class="row"><label>Field size<input type="number" inputmode="numeric" min="0" id="f_field"></label><label>Finish<input type="number" inputmode="numeric" min="0" id="f_finish"></label></div>`+dl('dlV',uniq('venue','mtt'))+dl('dlE',uniq('event','mtt'));
+  if(k==='online')h=`<div class="row"><label>Month<input type="month" id="f_month" required></label><label>Site<input id="f_venue" list="dlV" required placeholder="Phenom"></label><label>Cash in $<input type="number" inputmode="decimal" step="any" min="0" id="f_buy" required placeholder="Deposits"></label><label>Cash out $<input type="number" inputmode="decimal" step="any" min="0" id="f_out" required placeholder="Withdrawals"></label></div>`+dl('dlV',uniq('venue','online'));
+  $('fields').innerHTML=h;
+  for(const b of $('kindSeg').children)b.setAttribute('aria-pressed',b.dataset.k===k);
+  $('timerBtn').hidden=k!=='cash'||!!S.live||!!S.editId;
+  if($('f_date'))$('f_date').value=today();
+  if($('f_month'))$('f_month').value=today().slice(0,7);
+  netPreview()}
+$('kindSeg').onclick=e=>{const b=e.target.closest('button');if(!b||S.editId)return;S.kind=b.dataset.k;buildFields()};
+$('form').addEventListener('input',netPreview);
+function formNet(){const k=S.kind;const buy=k==='mtt'?num($('f_per')?.value)*Math.max(1,num($('f_ent')?.value)||1):num($('f_buy')?.value);
+  if($('f_out')?.value===''||(k!=='mtt'&&$('f_buy')?.value===''))return null;return num($('f_out').value)-buy}
+function netPreview(){const n=formNet();$('netPrev').textContent=n==null?'':money(n);$('netPrev').className='netprev '+(n==null?'':cls(n))}
+function readForm(){const k=S.kind,v=id=>($(id)?.value??'').trim();
+  const r={kind:k,venue:v('f_venue'),note:v('f_note'),game:v('f_game'),event:'',stakes:'',hours:null,entries:null,field:'',finish:''};
+  if(!r.venue)throw 'Add the casino or site.';
+  if(k==='online'){if(!v('f_month'))throw 'Pick the month.';if(v('f_buy')===''||v('f_out')==='')throw 'Enter cash in and cash out.';r.date=v('f_month')+'-01';r.buy_in=num(v('f_buy'));r.cash_out=num(v('f_out'));r.net=Math.round((r.cash_out-r.buy_in)*100)/100;r.event='Month total';r.game='';return r}
+  r.date=v('f_date');if(!r.date)throw 'Pick the date.';
+  if(k==='cash'){if(v('f_buy')===''||v('f_out')==='')throw 'Enter buy-in and cash-out.';r.stakes=v('f_stakes');r.event=r.stakes?'NL '+r.stakes:'';r.buy_in=num(v('f_buy'));r.cash_out=num(v('f_out'));r.hours=v('f_hours')===''?null:num(v('f_hours'))}
+  else{if(v('f_per')==='')throw 'Enter the buy-in.';r.event=v('f_event');r.entries=Math.max(1,Math.round(num(v('f_ent'))||1));r.buy_in=num(v('f_per'))*r.entries;r.cash_out=num(v('f_out'));r.field=v('f_field');r.finish=v('f_finish')}
+  r.net=Math.round((r.cash_out-r.buy_in)*100)/100;return r}
+function fillForm(r){S.kind=r.kind;buildFields();const set=(id,x)=>{if($(id))$(id).value=x??''};
+  set('f_venue',r.venue);set('f_note',r.note);set('f_game',r.game);
+  if(r.kind==='online'){const n=num(r.net),has=r.buy_in!=null||r.cash_out!=null;set('f_month',String(r.date).slice(0,7));set('f_buy',has?r.buy_in??0:Math.max(0,-n));set('f_out',has?r.cash_out??0:Math.max(0,n))}
+  else{set('f_date',r.date);set('f_out',r.cash_out);
+    if(r.kind==='cash'){set('f_stakes',r.stakes);set('f_buy',r.buy_in);set('f_hours',r.hours)}
+    else{const e=r.entries||1;set('f_event',r.event);set('f_ent',e);set('f_per',r.buy_in==null?'':Math.round(r.buy_in/e*100)/100);set('f_field',r.field);set('f_finish',r.finish)}}
+  netPreview()}
+function startEdit(id){const r=S.rows.find(x=>x.id===id);if(!r)return;S.editId=id;fillForm(r);$('saveBtn').textContent='Save changes';$('cancelEdit').hidden=false;$('timerBtn').hidden=true;location.hash='#log';scrollTo({top:0})}
+function endEdit(){S.editId=null;$('saveBtn').textContent='Save result';$('cancelEdit').hidden=true;$('f_note').value='';buildFields()}
+$('cancelEdit').onclick=endEdit;
+$('form').onsubmit=async e=>{e.preventDefault();if(!loaded)return status('Your results aren\'t loaded yet, so nothing was saved.');
+  let r;try{r=readForm()}catch(m){return toast(m)}
+  const id=S.editId||('e'+Date.now().toString(36)),prev=S.editId?S.rows.find(x=>x.id===id):null;
+  $('saveBtn').disabled=true;
+  try{const body={...r,updatedAt:new Date().toISOString()};if(prev?.createdAt)body.createdAt=prev.createdAt;else body.createdAt=body.updatedAt;
+    const row={id,...body};await db.upsert(row);setRow(row);
+    if(!prev&&S.live&&r.kind==='cash'){await db.live(null);setLive(null)}
+    const was=S.editId;endEdit();
+    toast((was?'Updated ':'Saved ')+money(r.net)+' at '+r.venue,async()=>{try{if(prev){await db.upsert(prev);setRow(prev)}else{await db.del(id);dropRow(id)}}catch{toast('Couldn\'t undo. Check your connection.')}})}
+  catch(err){toast('Couldn\'t save that. Check your connection and try again.')}
+  finally{$('saveBtn').disabled=false}};
+
+/* ---------- live timer ---------- */
+$('timerBtn').onclick=async()=>{if(!loaded)return;const v=id=>($(id)?.value??'').trim();
+  if(!v('f_venue'))return toast('Add the casino first.');
+  const L={start:new Date().toISOString(),venue:v('f_venue'),stakes:v('f_stakes'),game:v('f_game'),buy_in:num(v('f_buy')),date:v('f_date')||today()};
+  try{await db.live(L);setLive(L);toast('Timer started. Close the page any time; it keeps running.')}catch{toast('Couldn\'t start the timer. Try again.')}};
+$('addBtn').onclick=async()=>{const a=num($('addAmt').value);if(!a||!S.live)return;const L={...S.live,buy_in:num(S.live.buy_in)+a};try{await db.live(L);setLive(L);$('addAmt').value='';toast('Added '+money(a,false))}catch{toast('Couldn\'t add that. Try again.')}};
+$('endBtn').onclick=()=>{const L=S.live;if(!L)return;S.kind='cash';buildFields();
+  const h=Math.max(0.25,Math.round((Date.now()-Date.parse(L.start))/9e5)/4);
+  $('f_date').value=L.date;$('f_venue').value=L.venue;$('f_stakes').value=L.stakes||'';$('f_game').value=L.game||'';$('f_buy').value=L.buy_in||'';$('f_hours').value=h;$('f_out').focus();toast('Enter your cash-out, then save.')};
+function liveTick(){const L=S.live;$('live').classList.toggle('on',!!L);if(!L)return;const m=Math.floor((Date.now()-Date.parse(L.start))/6e4);
+  $('liveTime').textContent=Math.floor(m/60)+':'+String(m%60).padStart(2,'0');$('liveWhat').textContent=`${L.venue}${L.stakes?' '+L.stakes:''} · in for ${money(num(L.buy_in),false)}`}
+
+/* ---------- filtering & stats ---------- */
+function inPeriod(r){const p=$('pSel').value||'all',d=String(r.date);
+  if(p==='all')return true;if(/^\d{4}$/.test(p))return d.startsWith(p);
+  if(p==='custom'){const f=$('pFrom').value,t=$('pTo').value;return(!f||d>=f)&&(!t||d<=t)}
+  const days=+p.slice(1),c=new Date(Date.now()-days*864e5).toISOString().slice(0,10);return d>=c}
+function gameOk(r){const g=$('gSel').value;return !g||(g==='other'?(r.game&&r.game!=='NLH'):r.game===g)}
+const filtered=()=>S.rows.filter(r=>inPeriod(r)&&gameOk(r));
+function agg(rows){const o={net:0,n:0,buy:0,ent:0,cashes:0,hours:0,hnet:0,hn:0};
+  for(const r of rows){o.net+=num(r.net);o.n++;
+    if(r.kind==='mtt'){o.buy+=num(r.buy_in);o.ent+=r.entries||1;if(num(r.cash_out)>0)o.cashes++}
+    if(r.kind==='cash'&&r.hours>0){o.hours+=r.hours;o.hnet+=num(r.net);o.hn++}}
+  o.roi=o.buy?o.net/o.buy:null;o.itm=o.ent?o.cashes/o.ent:null;o.rate=o.hours?o.hnet/o.hours:null;return o}
+function band(p){return p<=300?'Up to $300':p<=600?'$301–600':p<=1100?'$601–1,100':p<=2000?'$1,101–2,000':'Over $2,000'}
+const BANDS=['Up to $300','$301–600','$601–1,100','$1,101–2,000','Over $2,000'];
+function group(rows,keyFn){const m=new Map();for(const r of rows){const k=keyFn(r);if(k==null)continue;if(!m.has(k))m.set(k,[]);m.get(k).push(r)}return m}
+function rowLine(r){const what=r.kind==='cash'?[r.stakes&&r.stakes!=='Not recorded'?r.stakes:'',r.hours?r.hours+'h':''].filter(Boolean).join(' · '):r.kind==='mtt'?[r.event,`${money(num(r.buy_in)/(r.entries||1),false)}${(r.entries||1)>1?' × '+r.entries:''}`,r.finish?(r.field?`${r.finish}/${r.field}`:'#'+r.finish):''].filter(Boolean).join(' · '):(r.buy_in!=null||r.cash_out!=null?`In ${money(num(r.buy_in),false)} · Out ${money(num(r.cash_out),false)}`:'Month total');
+  return {what,date:r.kind==='online'?new Date(r.date+'T12:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):new Date(r.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}}
+function li(r,acts){const l=rowLine(r);return `<li><span class="chip k-${r.kind}" title="${KIND[r.kind]}"></span><div><div><b>${esc(r.venue)}</b>${r.game?` <span class="pill">${esc(r.game)}</span>`:''}</div><div class="sub">${esc(l.date)}${l.what?' · '+esc(l.what):''}${r.note?' · '+esc(r.note):''}</div></div><div><div class="amt ${cls(num(r.net))}">${money(num(r.net))}</div>${acts?`<div class="li-act"><button type="button" data-e="${esc(r.id)}">Edit</button><button type="button" data-d="${esc(r.id)}">Delete</button></div>`:''}</div></li>`}
+
+/* ---------- render ---------- */
+function header(){const all=agg(S.rows),y=String(new Date().getFullYear()),ya=agg(S.rows.filter(r=>String(r.date).startsWith(y)));
+  $('hNet').textContent=money(ya.net);$('hNet').className='big';$('hSub').textContent=`${y} so far · ${money(all.net)} all-time`}
+function tile(label,val,sub,c){return `<div class="tile"><span>${esc(label)}</span><b class="${c||''}">${val}</b><span>${sub}</span></div>`}
+function renderLog(){const y=String(new Date().getFullYear()),m=today().slice(0,7);
+  const ry=S.rows.filter(r=>String(r.date).startsWith(y)),rm=S.rows.filter(r=>String(r.date).startsWith(m));
+  const a=agg(rm),b=agg(ry);
+  $('logTiles').innerHTML=tile('This month',money(a.net),`${a.n} result${a.n===1?'':'s'}`,cls(a.net))+tile(y+' cash rate',b.rate==null?'—':money(b.rate)+'/hr',`${Math.round(b.hours)} hours logged`,cls(b.rate))+tile(y+' tournament ROI',pct(b.roi),`${b.ent} entries · ${pc(b.itm)} cashed`,cls(b.roi));
+  const rec=[...S.rows].sort(byNew).slice(0,8);
+  $('recent').innerHTML=rec.length?rec.map(r=>li(r,true)).join(''):'<li><span></span><span class="mute">Nothing logged yet.</span><span></span></li>'}
+const byNew=(a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt||b.id).localeCompare(String(a.createdAt||a.id));
+function table(head,rows,opts={}){return `<div class="${opts.scroll?'scroll':''}"><table class="stack"><thead><tr>${head.map(h=>`<th class="${h.n?'n':''}">${esc(h.t)}</th>`).join('')}</tr></thead><tbody>${rows.join('')||`<tr><td colspan="${head.length}" class="mute">Nothing in this period.</td></tr>`}</tbody></table></div>`}
+const td=(v,n,c)=>`<td class="${n?'n':''} ${c||''}">${v}</td>`;
+function cashTable(m){return table([{t:'Where'},{t:'Sessions',n:1},{t:'Hours',n:1},{t:'Net',n:1},{t:'$/hr',n:1}],[...m].map(([k,rs])=>[k,agg(rs)]).sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>`<tr>${td(esc(k))}${td(o.n,1)}${td(o.hours?Math.round(o.hours*10)/10:'—',1)}${td(money(o.net),1,cls(o.net))}${td(o.rate==null?'—':money(o.rate),1,cls(o.rate))}</tr>`))}
+function mttTable(m,order,id){const ent=[...m].map(([k,rs])=>[k,agg(rs),rs]);if(order)ent.sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0]));else ent.sort((a,b)=>b[1].ent-a[1].ent);
+  return table([{t:id==='band'?'Buy-in':'Where'},{t:'Entries',n:1},{t:'Cash %',n:1},{t:'Buy-ins',n:1},{t:'Net',n:1},{t:'ROI',n:1}],ent.map(([k,o,rs],i)=>`<tr class="click" data-x="${id}${i}" aria-expanded="false" tabindex="0">${td('▸ '+esc(k))}${td(o.ent,1)}${td(pc(o.itm),1)}${td(money(o.buy,false),1)}${td(money(o.net),1,cls(o.net))}${td(pct(o.roi),1,cls(o.roi))}</tr><tr hidden data-xr="${id}${i}"><td colspan="6"><ul class="list">${[...rs].sort(byNew).map(r=>li(r)).join('')}</ul></td></tr>`))}
+function renderReports(){const rows=filtered(),cash=rows.filter(r=>r.kind==='cash'),mtt=rows.filter(r=>r.kind==='mtt'),onl=rows.filter(r=>r.kind==='online');
+  const A=agg(rows),C=agg(cash),M=agg(mtt),O=agg(onl);
+  $('gNote').hidden=!$('gSel').value;
+  $('tiles').innerHTML=tile('Total net',money(A.net),`${A.n} results`,cls(A.net))+tile('Live cash',money(C.net),C.rate==null?`${C.n} sessions`:`${money(C.rate)}/hr over ${Math.round(C.hours)}h`,cls(C.net))+tile('Live tournaments',money(M.net),`ROI ${pct(M.roi)} on ${money(M.buy,false)}`,cls(M.net))+tile('Tournament cash %',pc(M.itm),`${M.cashes} cashes in ${M.ent} entries`)+tile('Online',money(O.net),`${O.n} month${O.n===1?'':'s'}`,cls(O.net));
+  drawRun(rows);drawMonths(rows);
+  /* variance */
+  const hs=cash.filter(r=>r.hours>0);let sd=null;if(hs.length>2&&C.rate!=null){let ss=0;for(const r of hs){ss+=(num(r.net)-C.rate*r.hours)**2}sd=Math.sqrt(ss/C.hours)}
+  let peak=0,run=0,dd=0;for(const r of [...rows].sort((a,b)=>String(a.date).localeCompare(String(b.date)))){run+=num(r.net);peak=Math.max(peak,run);dd=Math.min(dd,run-peak)}
+  let streak=0,best=0;for(const r of [...cash].sort((a,b)=>String(a.date).localeCompare(String(b.date)))){streak=num(r.net)<0?streak+1:0;best=Math.max(best,streak)}
+  const win=cash.filter(r=>num(r.net)>0).length,bigW=cash.reduce((m,r)=>Math.max(m,num(r.net)),0),bigL=cash.reduce((m,r)=>Math.min(m,num(r.net)),0);
+  $('variance').innerHTML=table([{t:'Measure'},{t:'Value',n:1}],[['Win rate',C.rate==null?'—':money(C.rate)+'/hr'],['Swing per hour (std. dev.)',sd==null?'—':money(sd,false)+'/hr'],['Winning sessions',cash.length?`${win} of ${cash.length} (${pc(win/cash.length)})`:'—'],['Best / worst session',cash.length?`${money(bigW)} / ${money(bigL)}`:'—'],['Longest losing streak',best?best+' sessions':'—'],['Biggest downswing (all play)',dd?money(dd):'—']].map(([a,b])=>`<tr>${td(esc(a))}${td(b,1)}</tr>`));
+  /* trips */
+  const live=rows.filter(r=>r.kind!=='online').sort((a,b)=>String(a.date).localeCompare(String(b.date)));const trips=[];let cur=null;
+  for(const r of live){const t=Date.parse(r.date);if(cur&&t-cur.end<=3*864e5){cur.rs.push(r);cur.end=t;cur.to=r.date}else{cur={from:r.date,to:r.date,end:t,rs:[r]};trips.push(cur)}}
+  const tr=trips.filter(t=>t.rs.length>=4).reverse().slice(0,12);
+  $('trips').innerHTML=table([{t:'Dates'},{t:'Mostly at'},{t:'Cash',n:1},{t:'Tourneys',n:1},{t:'Net',n:1}],tr.map(t=>{const v=[...group(t.rs,r=>r.venue)].sort((a,b)=>b[1].length-a[1].length)[0][0];const c=agg(t.rs.filter(r=>r.kind==='cash')),m=agg(t.rs.filter(r=>r.kind==='mtt')),a=agg(t.rs);
+    const f=new Date(t.from+'T12:00'),to=new Date(t.to+'T12:00'),fmt={month:'short',day:'numeric'};
+    return `<tr class="click" data-trip="${t.from}|${t.to}" tabindex="0">${td(esc(f.toLocaleDateString('en-US',fmt)+'–'+to.toLocaleDateString('en-US',fmt)+', '+to.getFullYear()))}${td(esc(v))}${td(money(c.net),1,cls(c.net))}${td(money(m.net),1,cls(m.net))}${td(money(a.net),1,cls(a.net))}</tr>`}));
+  $('tStakes').innerHTML=cashTable(group(cash,r=>r.stakes||'Not recorded'));
+  $('tCashVenue').innerHTML=cashTable(group(cash,r=>r.venue));
+  $('tMttVenue').innerHTML=mttTable(group(mtt,r=>r.venue),null,'v');
+  $('tBand').innerHTML=mttTable(group(mtt,r=>band(num(r.buy_in)/(r.entries||1))),BANDS,'band');
+  const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];const dm=group(cash,r=>DOW[new Date(r.date+'T12:00').getDay()]);
+  $('tDow').innerHTML=cashTable(new Map(DOW.filter(d=>dm.has(d)).map(d=>[d,dm.get(d)])));
+  const LEN=['Under 3 hours','3–5 hours','5–8 hours','8+ hours'],lm=group(hs,r=>r.hours<3?LEN[0]:r.hours<5?LEN[1]:r.hours<8?LEN[2]:LEN[3]);
+  $('tLen').innerHTML=cashTable(new Map(LEN.filter(d=>lm.has(d)).map(d=>[d,lm.get(d)])));
+  const gm=group(rows.filter(r=>r.kind!=='online'),r=>r.game||'Not set');
+  $('tGame').innerHTML=table([{t:'Game'},{t:'Results',n:1},{t:'Net',n:1}],[...gm].map(([k,rs])=>[k,agg(rs)]).sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>`<tr>${td(esc(k))}${td(o.n,1)}${td(money(o.net),1,cls(o.net))}</tr>`));
+  const top=[...rows.filter(r=>r.kind!=='online')].sort((a,b)=>num(b.net)-num(a.net)).slice(0,6);
+  $('tBest').innerHTML=`<div class="card"><ul class="list">${top.map(r=>li(r)).join('')||'<li><span></span><span class="mute">Nothing in this period.</span><span></span></li>'}</ul></div>`}
+document.addEventListener('click',e=>{const x=e.target.closest('tr[data-x]');if(x){const o=document.querySelector(`tr[data-xr="${x.dataset.x}"]`);o.hidden=!o.hidden;x.setAttribute('aria-expanded',!o.hidden);x.cells[0].innerHTML=(o.hidden?'▸ ':'▾ ')+x.cells[0].innerHTML.slice(2);return}
+  const t=e.target.closest('tr[data-trip]');if(t){const [f,to]=t.dataset.trip.split('|');$('pSel').value='custom';$('pFrom').value=f;$('pTo').value=to;periodUI();render();scrollTo({top:0,behavior:'smooth'});return}
+  const ed=e.target.closest('[data-e]');if(ed)return startEdit(ed.dataset.e);
+  const del=e.target.closest('[data-d]');if(del)return delRow(del.dataset.d)});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr.click')){e.preventDefault();e.target.click()}});
+async function delRow(id){const r=S.rows.find(x=>x.id===id);if(!r||!loaded)return;try{await db.del(id);dropRow(id);toast('Deleted '+r.venue+' '+money(num(r.net)),async()=>{try{await db.upsert(r);setRow(r)}catch{toast('Couldn\'t undo. Check your connection.')}})}catch{toast('Couldn\'t delete that. Try again.')}}
+
+/* ---------- charts ---------- */
+const SER=[['all','Total','var(--tot)'],['mtt','Live tournaments','var(--mtt)'],['cash','Live cash','var(--cash)'],['online','Online','var(--onl)']];
+$('legend').innerHTML=SER.map(([k,l,c])=>`<button type="button" data-s="${k}" aria-pressed="true"><i style="background:${c}"></i>${l}</button>`).join('');
+$('legend').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.show[b.dataset.s]=!S.show[b.dataset.s];b.setAttribute('aria-pressed',S.show[b.dataset.s]);drawRun(filtered())};
+let runPts=[],monPts=[];
+function drawRun(rows){const s=$('runSvg'),W=s.clientWidth,H=s.clientHeight;if(!W)return;
+  const rs=[...rows].sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.createdAt||a.id).localeCompare(String(b.createdAt||b.id)));
+  const c={all:0,mtt:0,cash:0,online:0};runPts=[{i:0,date:rs[0]?.date,...c}];rs.forEach((r,i)=>{c.all+=num(r.net);c[r.kind]+=num(r.net);runPts.push({i:i+1,date:r.date,r,...c})});
+  if(rs.length<2){s.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="var(--mute)" font-size="14">Not enough results in this period</text>`;return}
+  const keys=SER.map(x=>x[0]).filter(k=>S.show[k]);let lo=0,hi=0;for(const p of runPts)for(const k of keys){lo=Math.min(lo,p[k]);hi=Math.max(hi,p[k])}if(hi===lo)hi=lo+1;
+  const L=W<520?44:62,R=12,T=10,B=26,x=i=>L+(W-L-R)*i/(runPts.length-1),y=v=>T+(H-T-B)*(hi-v)/(hi-lo);
+  const step=niceStep((hi-lo)/(H<260?3:5));let g='';for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${v===0?'stroke-width="1.5" stroke="var(--mute)"':''}/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" font-size="12" fill="var(--mute)">${short(v)}</text>`}
+  const yrs=[];let last='';runPts.forEach(p=>{const yy=String(p.date||'').slice(0,4);if(yy&&yy!==last){yrs.push([p.i,yy]);last=yy}});
+  let lx=-99;for(const [i,yy] of yrs){const X=x(i);if(X-lx<44)continue;lx=X;g+=`<line x1="${X}" x2="${X}" y1="${T}" y2="${H-B}" stroke="var(--line)" stroke-dasharray="2 4"/><text x="${X+4}" y="${H-8}" font-size="12" fill="var(--mute)">${yy}</text>`}
+  for(const [k,,col] of SER){if(!S.show[k])continue;g+=`<path d="${runPts.map((p,i)=>(i?'L':'M')+x(p.i).toFixed(1)+' '+y(p[k]).toFixed(1)).join('')}" fill="none" stroke="${col}" stroke-width="${k==='all'?2.5:2}" stroke-linejoin="round"/>`}
+  g+=`<line id="cross" y1="${T}" y2="${H-B}" stroke="var(--mute)" visibility="hidden"/><rect x="${L}" y="0" width="${W-L-R}" height="${H}" fill="transparent" id="runHit"/>`;s.innerHTML=g;
+  const tip=$('runTip');$('runHit').onpointermove=e=>{const b=s.getBoundingClientRect(),i=Math.max(0,Math.min(runPts.length-1,Math.round((e.clientX-b.left-L)/(W-L-R)*(runPts.length-1)))),p=runPts[i];
+    $('cross').setAttribute('x1',x(i));$('cross').setAttribute('x2',x(i));$('cross').setAttribute('visibility','visible');
+    tip.innerHTML=`<b>${esc(p.date||'')}</b>${p.r?`<br>${esc(p.r.venue)} ${money(num(p.r.net))}`:''}${SER.filter(z=>S.show[z[0]]).map(([k,l])=>`<br>${l}: ${money(p[k])}`).join('')}`;tip.style.display='block';
+    const tx=x(i)+12,tw=tip.offsetWidth;tip.style.left=(tx+tw>W?x(i)-tw-12:tx)+'px';tip.style.top='8px'};
+  $('runHit').onpointerleave=()=>{tip.style.display='none';$('cross').setAttribute('visibility','hidden')}}
+function niceStep(r){const p=10**Math.floor(Math.log10(r||1)),f=r/p;return (f<1.5?1:f<3?2:f<7?5:10)*p}
+function short(v){const a=Math.abs(v),s=a>=1000?(Math.round(a/100)/10)+'k':Math.round(a);return (v<0?'−':'')+'$'+s}
+function drawMonths(rows){const s=$('monSvg'),W=s.clientWidth,H=s.clientHeight;if(!W)return;const m=new Map();
+  for(const r of rows){const k=String(r.date).slice(0,7);m.set(k,(m.get(k)||0)+num(r.net))}
+  const ks=[...m.keys()].sort();if(!ks.length){s.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="var(--mute)" font-size="14">Nothing in this period</text>`;return}
+  const first=ks[0],lastK=ks[ks.length-1],all=[];let [yy,mm]=first.split('-').map(Number);while(true){const k=yy+'-'+String(mm).padStart(2,'0');all.push(k);if(k>=lastK)break;mm++;if(mm>12){mm=1;yy++}}
+  let lo=0,hi=0;for(const k of all){const v=m.get(k)||0;lo=Math.min(lo,v);hi=Math.max(hi,v)}if(hi===lo)hi=1;
+  const L=W<520?44:62,R=8,T=8,B=24,bw=(W-L-R)/all.length,y=v=>T+(H-T-B)*(hi-v)/(hi-lo);let g='';
+  const step=niceStep((hi-lo)/3);for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step)g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" font-size="12" fill="var(--mute)">${short(v)}</text>`;
+  monPts=all.map((k,i)=>({k,v:m.get(k)||0,x:L+i*bw}));
+  for(const p of monPts){if(!p.v)continue;const y0=y(0),y1=y(p.v),h=Math.max(1,Math.abs(y1-y0));g+=`<rect x="${(p.x+Math.min(1,bw*.1)).toFixed(1)}" width="${Math.max(1,bw-2).toFixed(1)}" y="${Math.min(y0,y1).toFixed(1)}" height="${h.toFixed(1)}" rx="${bw>8?2:0}" fill="${p.v>0?'var(--up)':'var(--down)'}"/>`}
+  g+=`<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--mute)"/>`;
+  let lx=-99;monPts.forEach(p=>{if(p.k.endsWith('-01')||p===monPts[0]){if(p.x-lx<44)return;lx=p.x;g+=`<text x="${p.x+2}" y="${H-6}" font-size="12" fill="var(--mute)">${p.k.slice(0,4)}</text>`}});
+  g+=`<rect x="${L}" y="0" width="${W-L-R}" height="${H}" fill="transparent" id="monHit"/>`;s.innerHTML=g;
+  const tip=$('monTip');$('monHit').onpointermove=e=>{const b=s.getBoundingClientRect(),i=Math.max(0,Math.min(monPts.length-1,Math.floor((e.clientX-b.left-L)/bw))),p=monPts[i];
+    tip.innerHTML=`<b>${new Date(p.k+'-15').toLocaleDateString('en-US',{month:'long',year:'numeric'})}</b><br>${money(p.v)}`;tip.style.display='block';const tw=tip.offsetWidth;tip.style.left=Math.min(W-tw,Math.max(0,p.x-tw/2))+'px';tip.style.top='4px'};
+  $('monHit').onpointerleave=()=>tip.style.display='none'}
+new ResizeObserver(()=>{if(S.view==='reports'){const r=filtered();drawRun(r);drawMonths(r)}}).observe($('runFig'));
+
+/* ---------- history ---------- */
+function histRows(){const q=$('hq').value.trim().toLowerCase(),k=$('hk').value;return [...S.rows].filter(r=>(!k||r.kind===k)&&(!q||[r.venue,r.event,r.stakes,r.note,r.game,r.date].join(' ').toLowerCase().includes(q))).sort(byNew)}
+function renderHistory(){const rs=histRows(),a=agg(rs);$('hCount').textContent=`${rs.length} results · ${money(a.net)}`;
+  $('hist').innerHTML=rs.slice(0,S.histN).map(r=>li(r,true)).join('')||'<li><span></span><span class="mute">No matches.</span><span></span></li>';$('more').hidden=rs.length<=S.histN}
+$('hq').oninput=()=>{S.histN=60;renderHistory()};$('hk').onchange=()=>{S.histN=60;renderHistory()};$('more').onclick=()=>{S.histN+=100;renderHistory()};
+$('copyCsv').onclick=async()=>{const cols=['date','kind','venue','event','stakes','game','buy_in','cash_out','net','hours','entries','field','finish','note'];
+  const q=v=>{const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
+  const txt=[cols.join(','),...[...S.rows].sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(r=>cols.map(c=>q(c==='kind'?KIND[r.kind]:r[c])).join(','))].join('\n');
+  try{await navigator.clipboard.writeText(txt);toast('Copied '+S.rows.length+' results. Paste into a sheet.')}catch{const t=$('csvBox');t.value=txt;t.hidden=false;t.focus();t.select();toast('Copying was blocked here. Press Ctrl+C to copy the selected text.')}};
+
+/* ---------- period select ---------- */
+function periodUI(){const c=$('pSel').value==='custom';$('fromL').hidden=!c;$('toL').hidden=!c}
+function fillPeriods(){const cur=$('pSel').value,ys=[...new Set(S.rows.map(r=>String(r.date).slice(0,4)))].sort().reverse();
+  $('pSel').innerHTML=`<option value="all">All time</option>${ys.map(y=>`<option value="${esc(y)}">${esc(y)}</option>`).join('')}<option value="d30">Last 30 days</option><option value="d90">Last 90 days</option><option value="d365">Last 12 months</option><option value="custom">Pick dates</option>`;
+  $('pSel').value=cur&&[...$('pSel').options].some(o=>o.value===cur)?cur:'all';periodUI()}
+$('pSel').onchange=()=>{periodUI();render()};$('pFrom').onchange=render;$('pTo').onchange=render;$('gSel').onchange=render;
+
+function render(){header();if(S.view==='log')renderLog();if(S.view==='reports')renderReports();if(S.view==='history')renderHistory()}
+
+/* ---------- start ---------- */
+buildFields();route();
+async function refresh(quiet){if(!KEY)return askKey();
+  if(!quiet)status('Loading your results…');
+  try{const j=await db.load();S.rows=j.rows||[];loaded=true;status('');fillPeriods();if(!S.editId&&!quiet)buildFields();setLive(j.live||null);render()}
+  catch(e){if(String(e.message)==='bad key'){ls.del('pokerlog_key');KEY='';askKey('That key didn\'t work. Check it and try again.')}else if(!quiet)status('Your results couldn\'t load. Check your connection; this page will try again in a minute.')}}
+function askKey(msg){$('status').classList.add('on');$('status').innerHTML='<form id="keyForm"><b>Enter your Poker Log key</b><p class="sub" style="margin:4px 0 10px">'+(msg?esc(msg)+' ':'')+'You only need to do this once on each device.</p><div style="display:flex;gap:10px;flex-wrap:wrap"><input id="keyIn" autocomplete="off" style="flex:1 1 220px;margin:0" placeholder="Key"><button class="btn" type="submit">Unlock</button></div></form>';
+  $('keyForm').onsubmit=e=>{e.preventDefault();KEY=$('keyIn').value.trim();if(!KEY)return;ls.set('pokerlog_key',KEY);refresh()}}
+refresh();
+setInterval(()=>{if(loaded&&!document.hidden&&!S.editId)refresh(true)},60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&loaded&&!S.editId)refresh(true)});
+liveT=setInterval(liveTick,30000);
+}
+</script>
+</body>
+</html>
