@@ -117,7 +117,7 @@ details summary{cursor:pointer;font-weight:600}
         <div class="seg" role="group" aria-label="Type" id="kindSeg">
           <button type="button" data-k="cash" aria-pressed="true">Cash</button>
           <button type="button" data-k="mtt" aria-pressed="false">Tournament</button>
-          <button type="button" data-k="online" aria-pressed="false">Online month</button>
+          <button type="button" data-k="online" aria-pressed="false">Online</button>
         </div>
         <form id="form" autocomplete="off">
           <div id="fields"></div>
@@ -132,6 +132,7 @@ details summary{cursor:pointer;font-weight:600}
       </div>
       <div>
         <div class="tiles" id="logTiles"></div>
+        <div class="card" style="margin-bottom:20px"><h2 id="monTitle">Online this month</h2><div id="monOnline"></div></div>
         <div class="card"><h2>Latest</h2><ul class="list" id="recent"></ul></div>
       </div>
     </div>
@@ -170,6 +171,9 @@ details summary{cursor:pointer;font-weight:600}
     <div class="sec cols">
       <div><h2>Cash by day of week</h2><div id="tDow"></div></div>
       <div><h2>Cash by session length</h2><div id="tLen"></div></div>
+    </div>
+    <div class="sec cols">
+      <div><h2>Online by month</h2><p class="sub" style="margin-top:-6px">Deposits and withdrawals added up per site each month. Tap a month to see each one.</p><div id="tOnline"></div></div>
     </div>
     <div class="sec cols">
       <div><h2>By game</h2><div id="tGame"></div></div>
@@ -239,7 +243,9 @@ function buildFields(){const k=S.kind;let h='';
   if(k==='mtt')h=`<div class="row"><label>Date<input type="date" id="f_date" required></label><label>Casino or series<input id="f_venue" list="dlV" required placeholder="WSOP"></label><label>Event<input id="f_event" list="dlE" placeholder="Daily Deepstack"></label>${gameSel()}</div>
    <div class="row"><label>Buy-in per entry $<input type="number" inputmode="decimal" step="any" min="0" id="f_per" required></label><label>Entries<input type="number" inputmode="numeric" min="1" step="1" id="f_ent" value="1"></label><label>Cashed for $<input type="number" inputmode="decimal" step="any" min="0" id="f_out" value="0"></label></div>
    <div class="row"><label>Field size<input type="number" inputmode="numeric" min="0" id="f_field"></label><label>Finish<input type="number" inputmode="numeric" min="0" id="f_finish"></label></div>`+dl('dlV',uniq('venue','mtt'))+dl('dlE',uniq('event','mtt'));
-  if(k==='online')h=`<div class="row"><label>Month<input type="month" id="f_month" required></label><label>Site<input id="f_venue" list="dlV" required placeholder="Phenom"></label><label>Cash in $<input type="number" inputmode="decimal" step="any" min="0" id="f_buy" required placeholder="Deposits"></label><label>Cash out $<input type="number" inputmode="decimal" step="any" min="0" id="f_out" required placeholder="Withdrawals"></label></div>`+dl('dlV',uniq('venue','online'));
+  if(k==='online')h=`<div class="row"><label>Type<select id="f_otype"><option value="dep">Deposit</option><option value="wd">Withdrawal</option><option value="month">Whole month (in and out)</option></select></label><label>Site<input id="f_venue" list="dlV" required placeholder="Phenom"></label></div>
+   <div class="row" id="oTx"><label>Date<input type="date" id="f_date" required></label><label>Amount $<input type="number" inputmode="decimal" step="any" min="0" id="f_amt" required></label></div>
+   <div class="row" id="oMon" hidden><label>Month<input type="month" id="f_month"></label><label>Cash in $<input type="number" inputmode="decimal" step="any" min="0" id="f_buy" placeholder="Deposits"></label><label>Cash out $<input type="number" inputmode="decimal" step="any" min="0" id="f_out" placeholder="Withdrawals"></label></div>`+dl('dlV',uniq('venue','online'));
   $('fields').innerHTML=h;
   for(const b of $('kindSeg').children)b.setAttribute('aria-pressed',b.dataset.k===k);
   $('timerBtn').hidden=k!=='cash'||!!S.live||!!S.editId;
@@ -247,21 +253,26 @@ function buildFields(){const k=S.kind;let h='';
   if($('f_month'))$('f_month').value=today().slice(0,7);
   netPreview()}
 $('kindSeg').onclick=e=>{const b=e.target.closest('button');if(!b||S.editId)return;S.kind=b.dataset.k;buildFields()};
-$('form').addEventListener('input',netPreview);
-function formNet(){const k=S.kind;const buy=k==='mtt'?num($('f_per')?.value)*Math.max(1,num($('f_ent')?.value)||1):num($('f_buy')?.value);
+function oToggle(){const t=$('f_otype');if(!t)return;const m=t.value==='month';$('oTx').hidden=m;$('oMon').hidden=!m;netPreview()}
+$('form').addEventListener('input',netPreview);$('form').addEventListener('change',e=>{if(e.target.id==='f_otype')oToggle()});
+function formNet(){const k=S.kind;if(k==='online'&&$('f_otype')?.value!=='month'){const a=$('f_amt')?.value;if(a===''||a==null)return null;return $('f_otype').value==='wd'?num(a):-num(a)}const buy=k==='mtt'?num($('f_per')?.value)*Math.max(1,num($('f_ent')?.value)||1):num($('f_buy')?.value);
   if($('f_out')?.value===''||(k!=='mtt'&&$('f_buy')?.value===''))return null;return num($('f_out').value)-buy}
 function netPreview(){const n=formNet();$('netPrev').textContent=n==null?'':money(n);$('netPrev').className='netprev '+(n==null?'':cls(n))}
 function readForm(){const k=S.kind,v=id=>($(id)?.value??'').trim();
   const r={kind:k,venue:v('f_venue'),note:v('f_note'),game:v('f_game'),event:'',stakes:'',hours:null,entries:null,field:'',finish:''};
   if(!r.venue)throw 'Add the casino or site.';
-  if(k==='online'){if(!v('f_month'))throw 'Pick the month.';if(v('f_buy')===''||v('f_out')==='')throw 'Enter cash in and cash out.';r.date=v('f_month')+'-01';r.buy_in=num(v('f_buy'));r.cash_out=num(v('f_out'));r.net=Math.round((r.cash_out-r.buy_in)*100)/100;r.event='Month total';r.game='';return r}
+  if(k==='online'){r.game='';const t=v('f_otype');
+    if(t==='month'){if(!v('f_month'))throw 'Pick the month.';if(v('f_buy')===''||v('f_out')==='')throw 'Enter cash in and cash out.';r.date=v('f_month')+'-01';r.buy_in=num(v('f_buy'));r.cash_out=num(v('f_out'));r.event='Month total'}
+    else{if(!v('f_date'))throw 'Pick the date.';if(v('f_amt')===''||!(num(v('f_amt'))>0))throw 'Enter the amount.';r.date=v('f_date');const a=num(v('f_amt'));r.event=t==='wd'?'Withdrawal':'Deposit';r.buy_in=t==='wd'?0:a;r.cash_out=t==='wd'?a:0}
+    r.net=Math.round((r.cash_out-r.buy_in)*100)/100;return r}
   r.date=v('f_date');if(!r.date)throw 'Pick the date.';
   if(k==='cash'){if(v('f_buy')===''||v('f_out')==='')throw 'Enter buy-in and cash-out.';r.stakes=v('f_stakes');r.event=r.stakes?'NL '+r.stakes:'';r.buy_in=num(v('f_buy'));r.cash_out=num(v('f_out'));r.hours=v('f_hours')===''?null:num(v('f_hours'))}
   else{if(v('f_per')==='')throw 'Enter the buy-in.';r.event=v('f_event');r.entries=Math.max(1,Math.round(num(v('f_ent'))||1));r.buy_in=num(v('f_per'))*r.entries;r.cash_out=num(v('f_out'));r.field=v('f_field');r.finish=v('f_finish')}
   r.net=Math.round((r.cash_out-r.buy_in)*100)/100;return r}
 function fillForm(r){S.kind=r.kind;buildFields();const set=(id,x)=>{if($(id))$(id).value=x??''};
   set('f_venue',r.venue);set('f_note',r.note);set('f_game',r.game);
-  if(r.kind==='online'){const n=num(r.net),has=r.buy_in!=null||r.cash_out!=null;set('f_month',String(r.date).slice(0,7));set('f_buy',has?r.buy_in??0:Math.max(0,-n));set('f_out',has?r.cash_out??0:Math.max(0,n))}
+  if(r.kind==='online'){if(r.event==='Deposit'||r.event==='Withdrawal'){set('f_otype',r.event==='Deposit'?'dep':'wd');set('f_date',r.date);set('f_amt',r.event==='Deposit'?r.buy_in:r.cash_out)}
+    else{const n=num(r.net),has=r.buy_in!=null||r.cash_out!=null;set('f_otype','month');set('f_month',String(r.date).slice(0,7));set('f_buy',has?r.buy_in??0:Math.max(0,-n));set('f_out',has?r.cash_out??0:Math.max(0,n))}oToggle()}
   else{set('f_date',r.date);set('f_out',r.cash_out);
     if(r.kind==='cash'){set('f_stakes',r.stakes);set('f_buy',r.buy_in);set('f_hours',r.hours)}
     else{const e=r.entries||1;set('f_event',r.event);set('f_ent',e);set('f_per',r.buy_in==null?'':Math.round(r.buy_in/e*100)/100);set('f_field',r.field);set('f_finish',r.finish)}}
@@ -308,8 +319,8 @@ function agg(rows){const o={net:0,n:0,buy:0,ent:0,cashes:0,hours:0,hnet:0,hn:0};
 function band(p){return p<=300?'Up to $300':p<=600?'$301–600':p<=1100?'$601–1,100':p<=2000?'$1,101–2,000':'Over $2,000'}
 const BANDS=['Up to $300','$301–600','$601–1,100','$1,101–2,000','Over $2,000'];
 function group(rows,keyFn){const m=new Map();for(const r of rows){const k=keyFn(r);if(k==null)continue;if(!m.has(k))m.set(k,[]);m.get(k).push(r)}return m}
-function rowLine(r){const what=r.kind==='cash'?[r.stakes&&r.stakes!=='Not recorded'?r.stakes:'',r.hours?r.hours+'h':''].filter(Boolean).join(' · '):r.kind==='mtt'?[r.event,`${money(num(r.buy_in)/(r.entries||1),false)}${(r.entries||1)>1?' × '+r.entries:''}`,r.finish?(r.field?`${r.finish}/${r.field}`:'#'+r.finish):''].filter(Boolean).join(' · '):(r.buy_in!=null||r.cash_out!=null?`In ${money(num(r.buy_in),false)} · Out ${money(num(r.cash_out),false)}`:'Month total');
-  return {what,date:r.kind==='online'?new Date(r.date+'T12:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):new Date(r.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}}
+function rowLine(r){const what=r.kind==='cash'?[r.stakes&&r.stakes!=='Not recorded'?r.stakes:'',r.hours?r.hours+'h':''].filter(Boolean).join(' · '):r.kind==='mtt'?[r.event,`${money(num(r.buy_in)/(r.entries||1),false)}${(r.entries||1)>1?' × '+r.entries:''}`,r.finish?(r.field?`${r.finish}/${r.field}`:'#'+r.finish):''].filter(Boolean).join(' · '):r.event==='Deposit'?'Deposit':r.event==='Withdrawal'?'Withdrawal':(r.buy_in!=null||r.cash_out!=null?`Month total · in ${money(num(r.buy_in),false)}, out ${money(num(r.cash_out),false)}`:'Month total');
+  return {what,date:r.kind==='online'&&r.event!=='Deposit'&&r.event!=='Withdrawal'?new Date(r.date+'T12:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):new Date(r.date+'T12:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}}
 function li(r,acts){const l=rowLine(r);return `<li><span class="chip k-${r.kind}" title="${KIND[r.kind]}"></span><div><div><b>${esc(r.venue)}</b>${r.game?` <span class="pill">${esc(r.game)}</span>`:''}</div><div class="sub">${esc(l.date)}${l.what?' · '+esc(l.what):''}${r.note?' · '+esc(r.note):''}</div></div><div><div class="amt ${cls(num(r.net))}">${money(num(r.net))}</div>${acts?`<div class="li-act"><button type="button" data-e="${esc(r.id)}">Edit</button><button type="button" data-d="${esc(r.id)}">Delete</button></div>`:''}</div></li>`}
 
 /* ---------- render ---------- */
@@ -320,6 +331,9 @@ function renderLog(){const y=String(new Date().getFullYear()),m=today().slice(0,
   const ry=S.rows.filter(r=>String(r.date).startsWith(y)),rm=S.rows.filter(r=>String(r.date).startsWith(m));
   const a=agg(rm),b=agg(ry);
   $('logTiles').innerHTML=tile('This month',money(a.net),`${a.n} result${a.n===1?'':'s'}`,cls(a.net))+tile(y+' cash rate',b.rate==null?'—':money(b.rate)+'/hr',`${Math.round(b.hours)} hours logged`,cls(b.rate))+tile(y+' tournament ROI',pct(b.roi),`${b.ent} entries · ${pc(b.itm)} cashed`,cls(b.roi));
+  $('monTitle').textContent='Online in '+new Date(m+'-15').toLocaleDateString('en-US',{month:'long'});
+  const om=S.rows.filter(r=>r.kind==='online'&&String(r.date).startsWith(m));
+  $('monOnline').innerHTML=om.length?siteTable(om):'<p class="sub" style="margin:0">No deposits or withdrawals logged yet this month.</p>';
   const rec=[...S.rows].sort(byNew).slice(0,8);
   $('recent').innerHTML=rec.length?rec.map(r=>li(r,true)).join(''):'<li><span></span><span class="mute">Nothing logged yet.</span><span></span></li>'}
 const byNew=(a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt||b.id).localeCompare(String(a.createdAt||a.id));
@@ -328,10 +342,16 @@ const td=(v,n,c)=>`<td class="${n?'n':''} ${c||''}">${v}</td>`;
 function cashTable(m){return table([{t:'Where'},{t:'Sessions',n:1},{t:'Hours',n:1},{t:'Net',n:1},{t:'$/hr',n:1}],[...m].map(([k,rs])=>[k,agg(rs)]).sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>`<tr>${td(esc(k))}${td(o.n,1)}${td(o.hours?Math.round(o.hours*10)/10:'—',1)}${td(money(o.net),1,cls(o.net))}${td(o.rate==null?'—':money(o.rate),1,cls(o.rate))}</tr>`))}
 function mttTable(m,order,id){const ent=[...m].map(([k,rs])=>[k,agg(rs),rs]);if(order)ent.sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0]));else ent.sort((a,b)=>b[1].ent-a[1].ent);
   return table([{t:id==='band'?'Buy-in':'Where'},{t:'Entries',n:1},{t:'Cash %',n:1},{t:'Buy-ins',n:1},{t:'Net',n:1},{t:'ROI',n:1}],ent.map(([k,o,rs],i)=>`<tr class="click" data-x="${id}${i}" aria-expanded="false" tabindex="0">${td('▸ '+esc(k))}${td(o.ent,1)}${td(pc(o.itm),1)}${td(money(o.buy,false),1)}${td(money(o.net),1,cls(o.net))}${td(pct(o.roi),1,cls(o.roi))}</tr><tr hidden data-xr="${id}${i}"><td colspan="6"><ul class="list">${[...rs].sort(byNew).map(r=>li(r)).join('')}</ul></td></tr>`))}
+function osum(rs){const o={dep:0,wd:0,net:0,n:0};for(const r of rs){o.dep+=num(r.buy_in);o.wd+=num(r.cash_out);o.net+=num(r.net);o.n++}return o}
+function siteTable(rs){const m=group(rs,r=>r.venue),all=osum(rs);return table([{t:'Site'},{t:'Deposits',n:1},{t:'Withdrawals',n:1},{t:'Net',n:1}],[...[...m].map(([k,x])=>[k,osum(x)]).sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>`<tr>${td(esc(k))}${td(money(o.dep,false),1)}${td(money(o.wd,false),1)}${td(money(o.net),1,cls(o.net))}</tr>`),m.size>1?`<tr>${td('<b>Total</b>')}${td(money(all.dep,false),1)}${td(money(all.wd,false),1)}${td('<b>'+money(all.net)+'</b>',1,cls(all.net))}</tr>`:''])}
+function onlineTable(rs,id){const byM=[...group(rs,r=>String(r.date).slice(0,7))].sort((a,b)=>b[0].localeCompare(a[0])).slice(0,24);
+  return table([{t:'Month'},{t:'Deposits',n:1},{t:'Withdrawals',n:1},{t:'Net',n:1}],byM.map(([k,x],i)=>{const o=osum(x),sites=[...new Set(x.map(r=>r.venue))].join(', ');
+    return `<tr class="click" data-x="${id}${i}" aria-expanded="false" tabindex="0">${td('▸ '+esc(new Date(k+'-15').toLocaleDateString('en-US',{month:'short',year:'numeric'}))+'<div class="sub">'+esc(sites)+'</div>')}${td(money(o.dep,false),1)}${td(money(o.wd,false),1)}${td(money(o.net),1,cls(o.net))}</tr><tr hidden data-xr="${id}${i}"><td colspan="4">${siteTable(x)}<ul class="list">${[...x].sort(byNew).map(r=>li(r)).join('')}</ul></td></tr>`}))}
 function renderReports(){const rows=filtered(),cash=rows.filter(r=>r.kind==='cash'),mtt=rows.filter(r=>r.kind==='mtt'),onl=rows.filter(r=>r.kind==='online');
   const A=agg(rows),C=agg(cash),M=agg(mtt),O=agg(onl);
   $('gNote').hidden=!$('gSel').value;
-  $('tiles').innerHTML=tile('Total net',money(A.net),`${A.n} results`,cls(A.net))+tile('Live cash',money(C.net),C.rate==null?`${C.n} sessions`:`${money(C.rate)}/hr over ${Math.round(C.hours)}h`,cls(C.net))+tile('Live tournaments',money(M.net),`ROI ${pct(M.roi)} on ${money(M.buy,false)}`,cls(M.net))+tile('Tournament cash %',pc(M.itm),`${M.cashes} cashes in ${M.ent} entries`)+tile('Online',money(O.net),`${O.n} month${O.n===1?'':'s'}`,cls(O.net));
+  $('tiles').innerHTML=tile('Total net',money(A.net),`${A.n} results`,cls(A.net))+tile('Live cash',money(C.net),C.rate==null?`${C.n} sessions`:`${money(C.rate)}/hr over ${Math.round(C.hours)}h`,cls(C.net))+tile('Live tournaments',money(M.net),`ROI ${pct(M.roi)} on ${money(M.buy,false)}`,cls(M.net))+tile('Tournament cash %',pc(M.itm),`${M.cashes} cashes in ${M.ent} entries`)+tile('Online',money(O.net),(m=>`${m} month${m===1?'':'s'}`)(new Set(onl.map(r=>String(r.date).slice(0,7))).size),cls(O.net));
+  $('tOnline').innerHTML=onlineTable(onl,'o');
   drawRun(rows);drawMonths(rows);
   /* variance */
   const hs=cash.filter(r=>r.hours>0);let sd=null;if(hs.length>2&&C.rate!=null){let ss=0;for(const r of hs){ss+=(num(r.net)-C.rate*r.hours)**2}sd=Math.sqrt(ss/C.hours)}
